@@ -1,0 +1,37 @@
+[
+  {
+    "name": "face_detector",
+    "url": "https://github.com/wlixill/face_detector",
+    "lang": "Python",
+    "desc": "基于 OpenCV DNN 的简单人脸识别实现。",
+    "fork": false
+  },
+  {
+    "name": "gemini-balance-lite",
+    "url": "https://github.com/wlixill/gemini-balance-lite",
+    "lang": "JavaScript",
+    "desc": "",
+    "fork": false
+  },
+  {
+    "name": "nbut_vision_ros2",
+    "url": "https://github.com/wlixill/nbut_vision_ros2",
+    "lang": "C",
+    "desc": "",
+    "fork": false
+  },
+  {
+    "name": "vision_project",
+    "url": "https://github.com/wlixill/vision_project",
+    "lang": "Python",
+    "desc": "机器视觉课程作业。",
+    "fork": false
+  },
+  {
+    "name": "agent-speed-ubuntu22",
+    "url": "https://github.com/wlixill/agent-speed-ubuntu22",
+    "lang": "C#",
+    "desc": "实时监控 Codex / Claude Code 的 token 速度。",
+    "fork": true
+  }
+]

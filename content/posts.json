@@ -1,0 +1,105 @@
+[
+  {
+    "slug": "tool-desk",
+    "title": "从一个丑首页，到能天天用的工具站",
+    "date": "2026-11-10",
+    "summary": "这个站点的由来：13 个本地小工具、一次彻底的视觉重做、一个把浏览器跑满的 ffmpeg，以及一个最终变成博客的首页。",
+    "tags": [
+      "Web",
+      "工具",
+      "复盘"
+    ],
+    "featured": true,
+    "minutes": 3
+  },
+  {
+    "slug": "verification-layers",
+    "title": "验证要分层：从 git diff 到真机，中间隔着五道门",
+    "date": "2026-10-12",
+    "summary": "和 AI 结对写代码之后，最危险的词是「已完成」。我把一次改动的验证拆成六层，每层只证明它自己那一层。",
+    "tags": [
+      "工程方法",
+      "AI 结对"
+    ],
+    "featured": true,
+    "minutes": 2
+  },
+  {
+    "slug": "cuda-slower",
+    "title": "给点云写了 CUDA，结果比 CPU 慢 16 倍",
+    "date": "2026-10-10",
+    "summary": "在 RTX 4060 上，体素降采样快了 8 倍，但加上统计离群点滤波之后，CUDA 版本慢了 16.8 倍。这不是 CUDA 的问题，是测量的方式的问题。",
+    "tags": [
+      "CUDA",
+      "点云",
+      "性能"
+    ],
+    "featured": false,
+    "minutes": 2
+  },
+  {
+    "slug": "git-discipline",
+    "title": "不要 reset 别人的工作：和 AI 协作时的 Git 纪律",
+    "date": "2026-06-02",
+    "summary": "AI 改代码很快，破坏也很快。几条我给自己定下的 Git 底线：只 stage 该 stage 的，父子仓库分开看，历史操作不自动复用授权。",
+    "tags": [
+      "Git",
+      "工程方法",
+      "AI 结对"
+    ],
+    "featured": false,
+    "minutes": 2
+  },
+  {
+    "slug": "multiple-definition",
+    "title": "两个同名类：一次 multiple definition 的排查",
+    "date": "2026-05-26",
+    "summary": "链接期报 multiple definition，指着的却是一段和业务毫无关系的代码。根因是两个静态库各定义了一个全局 PointCloudProcessor。",
+    "tags": [
+      "C++",
+      "链接",
+      "排错"
+    ],
+    "featured": false,
+    "minutes": 2
+  },
+  {
+    "slug": "depth-mask-alignment",
+    "title": "没对齐的深度图，不能直接用 RGB mask 去索引",
+    "date": "2026-05-25",
+    "summary": "分割 mask 在 RGB 图上，深度图在深度相机坐标系里。把同一对 (u, v) 直接用在两张图上，点云就会整片偏移。",
+    "tags": [
+      "RGBD",
+      "点云",
+      "坐标变换"
+    ],
+    "featured": false,
+    "minutes": 2
+  },
+  {
+    "slug": "letterbox-box-collapse",
+    "title": "框为什么贴在图像最上边：一次 letterbox 逆变换的复盘",
+    "date": "2026-05-20",
+    "summary": "YOLO 分割已经能跑出结果，但框全是零高度、贴在最上边。根因不在模型，而在预处理与后处理之间的那次坐标逆变换。",
+    "tags": [
+      "YOLO",
+      "后处理",
+      "调试"
+    ],
+    "featured": false,
+    "minutes": 2
+  },
+  {
+    "slug": "icp-silent-failure",
+    "title": "ICP 成功了，为什么屏幕上是空的",
+    "date": "2026-04-29",
+    "summary": "配准结果确实算出来了，但可视化里什么都看不到。原因是下一帧「没有有效 ROI」时，把上一帧的调试显示清掉了。",
+    "tags": [
+      "点云",
+      "可视化",
+      "调试"
+    ],
+    "featured": false,
+    "minutes": 2
+  }
+]

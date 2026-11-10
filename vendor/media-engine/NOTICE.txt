@@ -1,0 +1,4 @@
+FFmpeg.wasm @ffmpeg/ffmpeg 0.12.15 (MIT), @ffmpeg/core 0.12.10 (GPL-2.0-or-later).
+Source and build instructions: https://github.com/ffmpegwasm/ffmpeg.wasm
+FFmpeg source: https://ffmpeg.org/download.html
+Distributed engine packages: https://www.npmjs.com/package/@ffmpeg/core/v/0.12.10 and https://www.npmjs.com/package/@ffmpeg/ffmpeg/v/0.12.15
