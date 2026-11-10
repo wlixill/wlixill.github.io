@@ -3,8 +3,9 @@
 > 一个纯静态的个人站点：写调试笔记，也放 13 件顺手的本地工具。
 > 深/浅双主题，全屏动态背景（视频壁纸）+ 玻璃质感，可一键关闭。
 
-- 线上原版（改版前）：<https://particle-desk-wlixill.stormy-scout-9613.chatgpt.site>
+- **线上站点：<https://wlixill.github.io/>**（GitHub Pages，仓库 <https://github.com/wlixill/wlixill.github.io>）
 - 本地预览：`python3 -m http.server 4321` → <http://127.0.0.1:4321/>
+- 最早的原版（ChatGPT 生成）：<https://particle-desk-wlixill.stormy-scout-9613.chatgpt.site>
 
 ## 站点结构
 
@@ -124,7 +125,15 @@ node dev/fetch-github.mjs
 
 ## 部署
 
-任意静态托管（Vercel、Netlify、Cloudflare Pages、GitHub Pages、nginx…），发布 `redesign/` 目录即可。
+当前部署在 **GitHub Pages**：仓库 `wlixill.github.io`，`main` 分支根目录，推送即自动重建（约 1 分钟）。
+
+```bash
+# 改完文章或代码后
+git add -A && git commit -m "post: 新文章" && git push
+# 约 1 分钟后查看 https://wlixill.github.io/
+```
+
+也可以在任意静态托管（Vercel、Netlify、Cloudflare Pages、nginx…）发布这个目录。
 
 - 必须通过 HTTP 访问：文章用 `fetch` 读取，`file://` 下会被浏览器拦截。
 - `vendor/media-engine/` 约 31 MB，需随站点发布（或直接删掉，视频工具会提示引擎不可用）。
