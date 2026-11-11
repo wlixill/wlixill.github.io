@@ -1,7 +1,8 @@
-/* The pointer is a decorative lens; native cursors and hit targets remain intact. */
+/* A decorative glass lens: the real cursor and every hit target stay usable. */
 .liquid-pointer {
-  --lens-size: 72px;
+  --lens-size: 96px;
   --lens-angle: 0deg;
+  --lens-inverse-angle: 0deg;
   --lens-stretch: 1;
   --lens-squash: 1;
   position: fixed;
@@ -13,43 +14,47 @@
   pointer-events: none;
   opacity: 0;
   transform: translate3d(-150px, -150px, 0) translate(-50%, -50%);
-  transition: opacity 180ms ease;
+  transition: opacity 140ms ease;
   will-change: transform;
 }
 
-.liquid-pointer.is-visible {
-  opacity: 1;
-}
+.liquid-pointer.is-visible { opacity: 1; }
+.liquid-pointer.is-editing,
+.liquid-pointer.is-selecting { opacity: 0; }
 
-.liquid-pointer.is-editing {
-  opacity: 0.18;
+/* Stretch along the movement direction without rotating the light source. */
+.liquid-pointer__morph {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--lens-angle)) scale(var(--lens-stretch), var(--lens-squash)) rotate(var(--lens-inverse-angle));
 }
 
 .liquid-pointer__lens {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border: 1px solid rgba(230, 255, 250, 0.55);
-  border-radius: 47% 53% 51% 49% / 51% 47% 53% 49%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
   background:
-    radial-gradient(ellipse at 30% 18%, rgba(255, 255, 255, 0.35), transparent 33%),
-    radial-gradient(ellipse at 75% 88%, rgba(85, 225, 198, 0.16), transparent 38%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.10), rgba(159, 232, 220, 0.035) 48%, rgba(8, 45, 50, 0.12));
+    radial-gradient(ellipse 38% 20% at 23% 10%, rgba(255, 255, 255, 0.24), transparent 100%),
+    radial-gradient(ellipse 34% 18% at 78% 91%, rgba(229, 242, 255, 0.14), transparent 100%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012) 50%, rgba(12, 27, 34, 0.035));
   box-shadow:
-    inset 1px 1px 2px rgba(255, 255, 255, 0.8),
-    inset -2px -3px 7px rgba(2, 38, 39, 0.24),
-    0 5px 16px rgba(0, 20, 22, 0.18),
-    0 0 0 1px rgba(20, 129, 112, 0.10);
-  -webkit-backdrop-filter: blur(1.5px) saturate(1.35) brightness(1.04);
-  backdrop-filter: blur(1.5px) saturate(1.35) brightness(1.04);
-  transform: rotate(var(--lens-angle)) scale(var(--lens-stretch), var(--lens-squash));
-  transition: border-radius 220ms ease, box-shadow 220ms ease;
+    0 5px 15px rgba(0, 12, 20, 0.16),
+    inset 0 1px 2px rgba(255, 255, 255, 0.62),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.28),
+    inset 1px 0 2px rgba(255, 255, 255, 0.30),
+    inset -1px 0 3px rgba(13, 32, 42, 0.16);
+  -webkit-backdrop-filter: blur(1px) saturate(1.08);
+  backdrop-filter: blur(1px) saturate(1.08);
+  transform: scale(1);
+  transition: transform 190ms cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 190ms ease, box-shadow 190ms ease;
 }
 
-/* SVG displacement adds subtle refraction where supported; blur is the fallback. */
+/* The centre remains clear; the generated SVG field bends only the rim. */
 @supports (backdrop-filter: url("#liquid-pointer-refraction")) {
-  .liquid-pointer__lens {
-    backdrop-filter: url("#liquid-pointer-refraction") blur(1px) saturate(1.35) brightness(1.04);
+  .liquid-pointer.has-refraction .liquid-pointer__lens {
+    backdrop-filter: url("#liquid-pointer-refraction") blur(0.35px) saturate(1.05);
   }
 }
 
@@ -57,50 +62,57 @@
 .liquid-pointer__lens::after {
   content: "";
   position: absolute;
+  inset: 1px;
+  border-radius: inherit;
   pointer-events: none;
 }
 
 .liquid-pointer__lens::before {
-  inset: 3px;
-  border-radius: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.38), inset 0 -1px 2px rgba(225, 242, 255, 0.22);
+}
+
+/* An asymmetric bright edge and its quieter opposite, like light on glass. */
+@supports ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  .liquid-pointer__lens::before {
+    inset: 0;
+    border: 0;
+    padding: 2px;
+    background: conic-gradient(from -42deg,
+      rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.26) 12%,
+      rgba(215, 235, 255, 0.08) 30%, rgba(255, 255, 255, 0.32) 48%,
+      rgba(255, 255, 255, 0.70) 58%, rgba(224, 244, 255, 0.12) 75%,
+      rgba(255, 255, 255, 0.22) 90%, rgba(255, 255, 255, 0.85));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
 }
 
 .liquid-pointer__lens::after {
-  top: 11%;
-  left: 22%;
-  width: 42%;
-  height: 16%;
-  border-radius: 50%;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.65), transparent);
-  filter: blur(2px);
-  transform: rotate(-27deg);
+  inset: 5px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.22), inset 0 -1px 2px rgba(255, 255, 255, 0.12);
 }
 
 .liquid-pointer.is-interactive .liquid-pointer__lens {
-  border-radius: 42% 58% 47% 53% / 54% 44% 56% 46%;
-  box-shadow:
-    inset 1px 1px 2px rgba(255, 255, 255, 0.82),
-    inset -2px -3px 8px rgba(2, 38, 39, 0.28),
-    0 7px 20px rgba(0, 70, 62, 0.24),
-    0 0 0 1px rgba(50, 206, 177, 0.24);
+  border-radius: 48% 52% 49% 51% / 51% 48% 52% 49%;
+  transform: scale(1.06);
 }
 
-.liquid-pointer.is-pressed .liquid-pointer__lens {
-  transform: rotate(var(--lens-angle)) scale(calc(var(--lens-stretch) * 0.82), calc(var(--lens-squash) * 0.82));
-}
+.liquid-pointer.is-pressed .liquid-pointer__lens { transform: scale(0.95); }
+.liquid-pointer.is-interactive.is-pressed .liquid-pointer__lens { transform: scale(1); }
 
 [data-theme="light"] .liquid-pointer__lens {
-  border-color: rgba(255, 255, 255, 0.86);
-  background:
-    radial-gradient(ellipse at 30% 18%, rgba(255, 255, 255, 0.55), transparent 34%),
-    radial-gradient(ellipse at 75% 88%, rgba(45, 173, 151, 0.17), transparent 40%),
-    linear-gradient(140deg, rgba(255, 255, 255, 0.2), rgba(190, 235, 227, 0.08) 50%, rgba(18, 96, 83, 0.10));
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 5px 15px rgba(24, 39, 46, 0.13),
+    inset 0 1px 2px rgba(255, 255, 255, 0.86),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.46),
+    inset 1px 0 2px rgba(255, 255, 255, 0.40),
+    inset -1px 0 3px rgba(31, 54, 65, 0.12);
 }
 
 @media (prefers-reduced-motion: reduce), (forced-colors: active) {
-  .liquid-pointer {
-    display: none !important;
-  }
+  .liquid-pointer { display: none !important; }
 }

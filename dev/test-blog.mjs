@@ -51,6 +51,26 @@ async function press(key, code, keyCode) {
   await send('Input.dispatchKeyEvent', { type: 'keyUp', ...params });
 }
 
+async function glassState() {
+  return evaluate(`(() => {
+    const p = document.querySelector('.liquid-pointer');
+    const hit = document.elementFromPoint(760, 420);
+    const events = window.__glassTest || {};
+    return {
+      visible: !!p?.classList.contains('is-visible'),
+      pointerEvents: p ? getComputedStyle(p).pointerEvents : '',
+      target: hit?.id || '',
+      cursor: hit ? getComputedStyle(hit).cursor : '',
+      bodyCursor: getComputedStyle(document.body).cursor,
+      rootCursor: getComputedStyle(document.documentElement).cursor,
+      clicks: events.clicks || 0,
+      lastMove: events.moves?.at(-1) || '',
+      lastDown: events.downs?.at(-1) || '',
+      forcedColors: matchMedia('(forced-colors: active)').matches,
+    };
+  })()`);
+}
+
 try {
   await send('Page.enable');
   await send('Runtime.enable');
@@ -91,10 +111,115 @@ try {
   await pause(350);
   state = await evaluate(`(()=>{const p=document.querySelector('.liquid-pointer');const r=p?.getBoundingClientRect();return {visible:p?.classList.contains('is-visible'),pointerEvents:p&&getComputedStyle(p).pointerEvents,cx:r&&r.left+r.width/2,cy:r&&r.top+r.height/2};})()`);
   check('glass.mouse-follows', state.visible && state.pointerEvents === 'none' && Math.abs(state.cx - 760) < 2 && Math.abs(state.cy - 420) < 2, JSON.stringify(state));
+  state = await evaluate(`(() => {
+    const p = document.querySelector('.liquid-pointer');
+    return {
+      enabled: !!p?.classList.contains('has-refraction'),
+      map: p?.querySelector('feImage')?.getAttribute('href')?.slice(0, 24) || '',
+      input: p?.querySelector('feDisplacementMap')?.getAttribute('in2') || '',
+    };
+  })()`);
+  check('glass.refraction-map', state.enabled && state.map.startsWith('data:image/png;base64,') && state.input === 'glass-field', JSON.stringify(state));
+
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1200, y: 520 });
+  await pause(60);
+  state = await evaluate(`(()=>{const r=document.querySelector('.liquid-pointer').getBoundingClientRect();return Math.hypot(r.left+r.width/2-1200,r.top+r.height/2-520)})()`);
+  check('glass.fast-pointer-stays-inside', state <= 12.1, `distance=${state.toFixed(2)}px`);
+
+  await evaluate(`(()=>{const input=document.createElement('input');input.id='glass-test-input';input.style.cssText='position:fixed;left:720px;top:310px;width:80px;height:35px;z-index:2147482000';document.body.append(input)})()`);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 760, y: 325 });
+  await pause(200);
+  state = await evaluate(`(()=>{const p=document.querySelector('.liquid-pointer');return {editing:p.classList.contains('is-editing'),opacity:Number(getComputedStyle(p).opacity)}})()`);
+  check('glass.editing-hidden', state.editing && state.opacity < 0.02, JSON.stringify(state));
+  await evaluate(`document.querySelector('#glass-test-input').remove()`);
+
+  await evaluate(`(()=>{const text=document.createElement('p');text.id='glass-test-selection';text.textContent='Select this text';text.style.cssText='position:fixed;left:700px;top:300px;width:160px;height:50px;z-index:2147482000;user-select:text';document.body.append(text)})()`);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 730, y: 320 });
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 730, y: 320, button: 'left', clickCount: 1 });
+  await evaluate(`(()=>{const node=document.querySelector('#glass-test-selection').firstChild;const range=document.createRange();range.setStart(node,0);range.setEnd(node,6);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);document.dispatchEvent(new Event('selectionchange'))})()`);
+  state = await evaluate(`document.querySelector('.liquid-pointer').classList.contains('is-selecting')`);
+  check('glass.text-selection-hidden', state === true);
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 730, y: 320, button: 'left', clickCount: 1 });
+  await evaluate(`window.getSelection().removeAllRanges();document.querySelector('#glass-test-selection').remove()`);
+
+  // Put a real button below the lens. Hit testing and a CDP mouse click must
+  // reach it while the browser's regular pointer cursor remains in use.
+  await evaluate(`(() => {
+    const target = document.createElement('button');
+    target.id = 'glass-test-target';
+    target.type = 'button';
+    target.textContent = 'Glass test';
+    target.style.cssText = 'position:fixed;left:720px;top:380px;width:80px;height:80px;z-index:2147482000;cursor:pointer;pointer-events:auto;touch-action:none';
+    const events = window.__glassTest = { clicks: 0, moves: [], downs: [] };
+    target.addEventListener('pointermove', event => events.moves.push(event.pointerType));
+    target.addEventListener('pointerdown', event => events.downs.push(event.pointerType));
+    target.addEventListener('click', () => { events.clicks += 1; });
+    document.body.append(target);
+  })()`);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 760, y: 420 });
+  state = await glassState();
+  check('glass.native-hit-test', state.visible && state.pointerEvents === 'none' && state.target === 'glass-test-target' && state.cursor === 'pointer' && state.bodyCursor !== 'none' && state.rootCursor !== 'none', JSON.stringify(state));
+
   await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 760, y: 420, button: 'left', clickCount: 1 });
   state = await evaluate(`document.querySelector('.liquid-pointer')?.classList.contains('is-pressed')`);
   check('glass.click-squash', state === true);
   await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 760, y: 420, button: 'left', clickCount: 1 });
+  state = await glassState();
+  check('glass.real-mouse-click', state.clicks === 1 && state.lastDown === 'mouse', JSON.stringify(state));
+
+  // Emulate a hybrid device, first verifying that mouse input still works when
+  // touch is available. Check state at touchStart, before touchEnd can hide it.
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 761, y: 421, pointerType: 'mouse' });
+  state = await glassState();
+  check('glass.hybrid-mouse-before-touch', state.visible && state.lastMove === 'mouse', JSON.stringify(state));
+  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 761, y: 421, id: 1 }] });
+  state = await glassState();
+  check('glass.touch-hides', !state.visible && state.lastDown === 'touch', JSON.stringify(state));
+  await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 769, y: 429, id: 1 }] });
+  state = await glassState();
+  check('glass.touch-move-hidden', !state.visible && state.lastMove === 'touch', JSON.stringify(state));
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 762, y: 422, pointerType: 'mouse' });
+  state = await glassState();
+  check('glass.mouse-restores-after-touch', state.visible && state.lastMove === 'mouse', JSON.stringify(state));
+
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 763, y: 423, pointerType: 'pen' });
+  state = await glassState();
+  check('glass.pen-move-hides', !state.visible && state.lastMove === 'pen', JSON.stringify(state));
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 764, y: 424, pointerType: 'mouse' });
+  state = await glassState();
+  check('glass.mouse-restores-after-pen', state.visible && state.lastMove === 'mouse', JSON.stringify(state));
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 765, y: 425, button: 'left', buttons: 1, clickCount: 1, pointerType: 'pen' });
+  state = await glassState();
+  check('glass.pen-down-hides', !state.visible && state.lastDown === 'pen', JSON.stringify(state));
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 765, y: 425, button: 'left', buttons: 0, clickCount: 1, pointerType: 'pen' });
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 766, y: 426, pointerType: 'mouse' });
+  state = await glassState();
+  check('glass.mouse-restores-after-pen-down', state.visible && state.lastMove === 'mouse', JSON.stringify(state));
+
+  // Exercise the window blur listener without depending on headless OS focus.
+  await evaluate(`window.dispatchEvent(new Event('blur'))`);
+  state = await glassState();
+  check('glass.blur-hides', !state.visible, JSON.stringify(state));
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 767, y: 427, pointerType: 'mouse' });
+  state = await glassState();
+  check('glass.mouse-restores-after-blur', state.visible && state.lastMove === 'mouse', JSON.stringify(state));
+
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }, { name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'forced-colors', value: 'active' }] });
+  await pause(100);
+  state = await glassState();
+  check('glass.forced-colors-hides', state.forcedColors && !state.visible, JSON.stringify(state));
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 768, y: 428, pointerType: 'mouse' });
+  state = await glassState();
+  check('glass.forced-colors-stays-hidden', state.forcedColors && !state.visible, JSON.stringify(state));
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }, { name: 'prefers-reduced-motion', value: 'no-preference' }, { name: 'forced-colors', value: 'none' }] });
+  await pause(100);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 769, y: 429, pointerType: 'mouse' });
+  state = await glassState();
+  check('glass.mouse-restores-after-forced-colors', !state.forcedColors && state.visible && state.lastMove === 'mouse', JSON.stringify(state));
+  await evaluate(`document.querySelector('#glass-test-target')?.remove(); delete window.__glassTest`);
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
   await pause(100);
   await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 600, y: 300 });
