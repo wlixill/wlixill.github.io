@@ -3,6 +3,14 @@ import { icon } from './icons.js';
 import { $, $$, esc, greeting, relTime, toast } from './ui.js';
 import { parseFrontMatter, renderMarkdown, wireCodeCopy } from './markdown.js';
 
+// Resolve against the deployed asset directory, not the current article URL.
+const siteRoot = new URL('../', import.meta.url);
+const postHref = (slug) => new URL(`posts/${encodeURIComponent(slug)}/`, siteRoot).pathname;
+const archiveHref = new URL('posts/', siteRoot).pathname;
+const rootHashUrl = (hash) => new URL(hash, siteRoot).href;
+const staticPostSlug = document.body.dataset.staticPost;
+const staticArchive = document.body.hasAttribute('data-static-archive');
+
 const store = {
   get(key, fallback) {
     try {
@@ -42,7 +50,7 @@ function paintProfile() {
   if (name) name.textContent = profile.name;
 }
 
-const profileReady = fetch('content/profile.json', { cache: 'no-cache' })
+const profileReady = fetch(new URL('content/profile.json', siteRoot), { cache: 'no-cache' })
   .then((r) => (r.ok ? r.json() : null))
   .then((p) => {
     if (p) profile = { ...DEFAULT_PROFILE, ...p };
@@ -86,14 +94,28 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
    ========================================================================== */
 const backdropVideo = $('#backdropVideo');
 const bgToggle = $('#bgToggle');
+const bgLabel = $('.bg-label', bgToggle);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const saveData = Boolean(navigator.connection?.saveData);
+const savedBackdrop = store.get('pd-bg', null);
 
-const bgState = { on: store.get('pd-bg', !saveData) };
+// On a first touch-device visit retain the poster, but do not download the
+// video. A visitor can explicitly switch the background off and back on.
+const bgState = {
+  on: savedBackdrop === null ? !saveData : Boolean(savedBackdrop),
+  posterOnly: savedBackdrop === null && matchMedia('(pointer: coarse)').matches,
+};
+
+function syncBackdropControl() {
+  const still = bgState.posterOnly || reduceMotion.matches;
+  bgToggle?.setAttribute('aria-pressed', String(bgState.on));
+  bgToggle?.setAttribute('aria-label', bgState.on ? `关闭${still ? '静态' : '动态'}背景` : '开启动态背景');
+  if (bgLabel) bgLabel.textContent = bgState.on ? (still ? '静态' : '动态') : '背景关';
+}
 
 function ensureVideoSrc() {
   if (!backdropVideo || backdropVideo.dataset.loaded === '1') return;
-  if (reduceMotion.matches) return;
+  if (reduceMotion.matches || bgState.posterOnly) return;
   backdropVideo.src = backdropVideo.dataset.src;
   backdropVideo.dataset.loaded = '1';
   backdropVideo.load();
@@ -101,7 +123,7 @@ function ensureVideoSrc() {
 
 function playBackdrop() {
   if (!bgState.on || !backdropVideo) return;
-  if (reduceMotion.matches) {
+  if (reduceMotion.matches || bgState.posterOnly) {
     backdropVideo.pause();
     return;
   }
@@ -112,9 +134,10 @@ function playBackdrop() {
 
 function applyBackdrop(on, persist = true) {
   bgState.on = on;
+  if (persist && on) bgState.posterOnly = false;
   document.documentElement.setAttribute('data-bg', on ? 'on' : 'off');
-  bgToggle?.setAttribute('aria-pressed', String(on));
   if (persist) store.set('pd-bg', on);
+  syncBackdropControl();
   if (on) playBackdrop();
   else backdropVideo?.pause();
 }
@@ -123,10 +146,13 @@ applyBackdrop(bgState.on, false);
 
 bgToggle?.addEventListener('click', () => {
   applyBackdrop(!bgState.on);
-  toast(bgState.on ? '动态背景已开启' : '动态背景已关闭');
+  toast(bgState.on ? (reduceMotion.matches ? '静态背景已开启' : '动态背景已开启') : '背景已关闭');
 });
 
-reduceMotion.addEventListener?.('change', playBackdrop);
+reduceMotion.addEventListener?.('change', () => {
+  playBackdrop();
+  syncBackdropControl();
+});
 
 document.addEventListener('visibilitychange', () => {
   if (!backdropVideo) return;
@@ -135,8 +161,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 backdropVideo?.addEventListener('error', () => {
+  bgState.on = false;
   document.documentElement.setAttribute('data-bg', 'off');
-  bgToggle?.setAttribute('aria-pressed', 'false');
+  syncBackdropControl();
 });
 
 /* ==========================================================================
@@ -148,7 +175,7 @@ const postCache = new Map();
 
 function loadPosts() {
   if (!postsPromise) {
-    postsPromise = fetch('content/posts.json', { cache: 'no-cache' })
+    postsPromise = fetch(new URL('content/posts.json', siteRoot), { cache: 'no-cache' })
       .then((r) => {
         if (!r.ok) throw new Error('文章索引加载失败');
         return r.json();
@@ -170,7 +197,7 @@ async function loadPost(slug) {
   const list = await loadPosts();
   const meta = list.find((p) => p.slug === slug);
   if (!meta) return null;
-  const res = await fetch(`content/posts/${slug}.md`, { cache: 'no-cache' });
+  const res = await fetch(new URL(`content/posts/${encodeURIComponent(slug)}.md`, siteRoot), { cache: 'no-cache' });
   if (!res.ok) return null;
   const { body } = parseFrontMatter(await res.text());
   const rendered = renderMarkdown(body);
@@ -184,7 +211,7 @@ let reposCache = [];
 
 function loadRepos() {
   if (!reposPromise) {
-    reposPromise = fetch('content/repos.json', { cache: 'no-cache' })
+    reposPromise = fetch(new URL('content/repos.json', siteRoot), { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : []))
       .then((list) => {
         reposCache = list;
@@ -232,7 +259,7 @@ function paintNavPosts() {
   slot.innerHTML = postsCache
     .slice(0, 4)
     .map(
-      (p) => `<a class="nav-post" href="#/post/${p.slug}" data-slug="${p.slug}">
+      (p) => `<a class="nav-post" href="${postHref(p.slug)}" data-slug="${p.slug}">
         <span class="nav-post-title">${esc(p.title)}</span>
         <span class="nav-post-date">${fmtDate(p.date)}</span>
       </a>`
@@ -243,6 +270,8 @@ function paintNavPosts() {
 loadPosts()
   .then(() => {
     paintNavPosts();
+    const route = parseRoute();
+    setActiveNav(route.name, route);
     refreshPaletteData();
   })
   .catch(() => {});
@@ -251,19 +280,57 @@ loadPosts()
 const rail = $('#rail');
 const scrim = $('#scrim');
 const menuBtn = $('#menuBtn');
+const narrowLayout = matchMedia('(max-width: 1024px)');
 
 function setDrawer(open) {
-  rail.classList.toggle('open', open);
-  menuBtn?.setAttribute('aria-expanded', String(open));
-  if (scrim) scrim.hidden = !open;
-  document.body.style.overflow = open ? 'hidden' : '';
+  const wasOpen = rail.classList.contains('open');
+  const show = Boolean(open && narrowLayout.matches);
+  if (wasOpen && !show && narrowLayout.matches && rail.contains(document.activeElement)) {
+    menuBtn?.focus({ preventScroll: true });
+  }
+  rail.classList.toggle('open', show);
+  rail.inert = narrowLayout.matches && !show;
+  if (rail.inert) rail.setAttribute('aria-hidden', 'true');
+  else rail.removeAttribute('aria-hidden');
+  menuBtn?.setAttribute('aria-expanded', String(show));
+  if (scrim) scrim.hidden = !show;
+  document.body.style.overflow = show ? 'hidden' : '';
+  if (show && !wasOpen) $('#railClose')?.focus({ preventScroll: true });
 }
 
+setDrawer(false);
+narrowLayout.addEventListener?.('change', () => setDrawer(false));
 menuBtn?.addEventListener('click', () => setDrawer(!rail.classList.contains('open')));
 $('#railClose')?.addEventListener('click', () => setDrawer(false));
 scrim?.addEventListener('click', () => setDrawer(false));
 nav.addEventListener('click', (e) => {
-  if (e.target.closest('a') && window.innerWidth <= 1024) setDrawer(false);
+  if (e.target.closest('a') && narrowLayout.matches) setDrawer(false);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!rail.classList.contains('open') || !narrowLayout.matches || !$('#palette').hidden) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    setDrawer(false);
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const focusable = $$('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])', rail)
+    .filter((el) => el.getClientRects().length);
+  if (!focusable.length) {
+    e.preventDefault();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!rail.contains(document.activeElement) || (e.shiftKey && document.activeElement === first)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
 });
 
 /* ==========================================================================
@@ -286,14 +353,14 @@ function postCard(p) {
       <time>${fmtDate(p.date)}</time>
       <span class="post-card-min">${p.minutes} 分钟</span>
     </div>
-    <h3><a class="post-card-link" href="#/post/${p.slug}">${esc(p.title)}</a></h3>
+    <h3><a class="post-card-link" href="${postHref(p.slug)}">${esc(p.title)}</a></h3>
     <p>${esc(p.summary)}</p>
     <div class="post-card-foot">${(p.tags || []).slice(0, 3).map(tagLink).join('')}</div>
   </article>`;
 }
 
 function postRow(p) {
-  return `<a class="post-row" href="#/post/${p.slug}">
+  return `<a class="post-row" href="${postHref(p.slug)}">
     <time class="post-row-date">${fmtDate(p.date)}</time>
     <div class="post-row-main">
       <h3>${esc(p.title)}</h3>
@@ -303,8 +370,17 @@ function postRow(p) {
   </a>`;
 }
 
+function featuredArticle(post, index) {
+  return `<a class="featured-article" href="${postHref(post.slug)}">
+    <span class="featured-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
+    <span class="featured-copy"><strong>${esc(post.title)}</strong><small>${esc((post.tags || []).slice(0, 2).join(' · '))}</small></span>
+    ${icon('arrowRight')}
+  </a>`;
+}
+
 function homeMarkup() {
   const latest = postsCache.slice(0, 4);
+  const featured = postsCache.filter((post) => post.featured).slice(0, 3);
   const toolChips = TOOLS.slice(0, 6);
   return `
     <section class="blog-hero">
@@ -321,6 +397,9 @@ function homeMarkup() {
         </div>
       </div>
     </section>
+
+    ${featured.length ? `<div class="section-head"><h2>精选文章</h2><span class="section-link">从这里开始</span></div>
+    <div class="featured-grid">${featured.map(featuredArticle).join('')}</div>` : ''}
 
     <div class="section-head">
       <h2>最新文章</h2>
@@ -345,6 +424,10 @@ function postsMarkup(tag) {
   const counts = new Map();
   postsCache.forEach((p) => (p.tags || []).forEach((t) => counts.set(t, (counts.get(t) || 0) + 1)));
   const tags = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
+  const primary = ['点云', 'RGBD', 'YOLO', '工程方法', '调试'].filter((t) => counts.has(t));
+  if (tag && counts.has(tag) && !primary.includes(tag)) primary.push(tag);
+  const remaining = tags.filter((t) => !primary.includes(t));
+  const filterLink = (t) => `<a class="filter-chip" href="#/posts/${encodeURIComponent(t)}"${t === tag ? ' aria-current="page"' : ''}>${esc(t)}</a>`;
   return `
     <header class="page-head">
       <span class="page-kicker">${list.length} 篇</span>
@@ -352,10 +435,11 @@ function postsMarkup(tag) {
       <p>${tag ? `带「${esc(tag)}」标签的文章。` : '按时间倒序。每一篇都来自一次真实的调试。'}</p>
     </header>
 
-    <div class="tag-filter">
-      <a class="filter-chip" href="#/posts" aria-pressed="${!tag}">全部</a>
-      ${tags.map((t) => `<a class="filter-chip" href="#/posts/${encodeURIComponent(t)}" aria-pressed="${t === tag}">${esc(t)}</a>`).join('')}
-    </div>
+    <nav class="tag-filter" aria-label="按文章标签筛选">
+      <a class="filter-chip" href="#/posts"${!tag ? ' aria-current="page"' : ''}>全部</a>
+      ${primary.map(filterLink).join('')}
+      ${remaining.length ? `<details class="tag-more"><summary class="filter-chip">更多标签（${remaining.length}）</summary><div class="tag-filter-extra">${remaining.map(filterLink).join('')}</div></details>` : ''}
+    </nav>
 
     <div class="post-rows">
       ${list.length ? list.map(postRow).join('') : '<div class="empty-note">这个标签下还没有文章</div>'}
@@ -378,7 +462,7 @@ async function postMarkup(slug) {
   const older = list[idx + 1];
   return `
     <div class="post-wrap">
-    <a class="backlink" href="#/posts">${icon('arrowLeft')}全部文章</a>
+    <a class="backlink" href="${archiveHref}">${icon('arrowLeft')}全部文章</a>
     <article class="post">
       <header class="post-head">
         <h1>${esc(post.title)}</h1>
@@ -393,8 +477,8 @@ async function postMarkup(slug) {
       <div class="post-body">${post.html}</div>
       <footer class="post-foot">
         <div class="post-nav">
-          ${older ? `<a class="post-nav-item" href="#/post/${older.slug}"><span>上一篇</span><strong>${esc(older.title)}</strong></a>` : ''}
-          ${newer ? `<a class="post-nav-item next" href="#/post/${newer.slug}"><span>下一篇</span><strong>${esc(newer.title)}</strong></a>` : ''}
+          ${older ? `<a class="post-nav-item" href="${postHref(older.slug)}"><span>上一篇</span><strong>${esc(older.title)}</strong></a>` : ''}
+          ${newer ? `<a class="post-nav-item next" href="${postHref(newer.slug)}"><span>下一篇</span><strong>${esc(newer.title)}</strong></a>` : ''}
         </div>
       </footer>
     </article>
@@ -427,7 +511,7 @@ async function aboutMarkup() {
         <p>尽量写清楚四件事：<strong>现象</strong>、<strong>原因</strong>、<strong>怎么确认</strong>、<strong>哪一层还没验证</strong>。不把猜测写成结论，也不把「本地通过」说成「已经上线」。</p>
 
         <h2>技术栈</h2>
-        <p>C++ / Python，ROS 2，OpenCV，PCL，ONNX Runtime，CUDA，以及一套自己攒的 Web 小工具。这个站点是纯静态的：没有框架、没有构建、没有服务端。</p>
+        <p>C++ / Python，ROS 2，OpenCV，PCL，ONNX Runtime，CUDA，以及一套自己攒的 Web 小工具。这个站点是纯静态的：没有框架、没有服务端，文章预先生成 HTML。</p>
 
         <h2>开源</h2>
         <ul class="repo-list">
@@ -553,15 +637,31 @@ function toolMarkup(tool) {
    router
    ========================================================================== */
 const view = $('#view');
+wireCodeCopy(view);
 let cleanup = null;
 let token = 0;
 
+function isRouteHash(hash) {
+  if (!hash) return false;
+  const fragment = hash.replace(/^#\/?/, '');
+  return hash.startsWith('#/') || /^(?:post|posts|tools)(?:\/|$)/.test(fragment) || fragment === 'about' || Boolean(toolById(fragment));
+}
+
 function parseRoute() {
   const hash = location.hash.replace(/^#\/?/, '');
+  if (!isRouteHash(location.hash)) {
+    if (staticPostSlug) return { name: 'post', slug: staticPostSlug, static: true };
+    if (staticArchive) return { name: 'posts', static: true };
+    return !hash || hash === 'view' ? { name: 'home' } : { name: 'notfound' };
+  }
   if (!hash) return { name: 'home' };
   if (hash === 'posts') return { name: 'posts' };
-  if (hash.startsWith('posts/')) return { name: 'posts', tag: decodeURIComponent(hash.slice(6)) };
-  if (hash.startsWith('post/')) return { name: 'post', slug: decodeURIComponent(hash.slice(5)) };
+  try {
+    if (hash.startsWith('posts/')) return { name: 'posts', tag: decodeURIComponent(hash.slice(6)) };
+    if (hash.startsWith('post/')) return { name: 'post', slug: decodeURIComponent(hash.slice(5)), legacyPost: true };
+  } catch {
+    return { name: 'notfound' };
+  }
   if (hash === 'tools') return { name: 'tools' };
   if (hash.startsWith('tools/')) return { name: 'tool', id: hash.slice(6) };
   if (hash === 'about') return { name: 'about' };
@@ -590,8 +690,34 @@ async function render() {
   const my = ++token;
   const route = parseRoute();
 
+  // Old article hashes become real URLs so sharing and reloading use the
+  // article's own HTML and metadata. Unknown slugs keep the old not-found UI.
+  if (route.legacyPost) {
+    try {
+      const posts = await loadPosts();
+      if (my !== token) return;
+      if (posts.some((post) => post.slug === route.slug)) {
+        location.replace(postHref(route.slug));
+        return;
+      }
+    } catch {
+      if (my !== token) return;
+    }
+    if (staticPostSlug || staticArchive) {
+      location.replace(rootHashUrl(`#/post/${encodeURIComponent(route.slug)}`));
+      return;
+    }
+  }
+
+  // Hash routes belong to the root app, even if a visitor appends one to a
+  // static page. Ordinary document anchors stay on that article.
+  if ((staticPostSlug || staticArchive) && isRouteHash(location.hash)) {
+    const hash = route.legacy ? `#/tools/${route.id}` : location.hash.startsWith('#/') ? location.hash : `#/${location.hash.slice(1)}`;
+    location.replace(rootHashUrl(hash));
+    return;
+  }
   if (route.legacy) {
-    location.replace(`#/tools/${route.id}`);
+    location.replace(rootHashUrl(`#/tools/${route.id}`));
     return;
   }
 
@@ -601,6 +727,10 @@ async function render() {
   }
 
   setActiveNav(route.name, route);
+
+  // The server-rendered article is already the complete view. Retain it even
+  // if an index/Markdown request fails; only enhance its existing controls.
+  if (route.name === 'post' && route.static) return;
 
   if (route.name !== 'tool') {
     view.innerHTML = '<div class="loading">加载中…</div>';
@@ -624,7 +754,6 @@ async function render() {
       if (my !== token) return;
       view.innerHTML = html;
       document.title = `${view.querySelector('.post-head h1')?.textContent || '文章'} · wlixill`;
-      wireCodeCopy(view);
     } else if (route.name === 'tools') {
       view.innerHTML = toolsMarkup();
       document.title = '工具箱 · wlixill';
@@ -664,7 +793,10 @@ async function render() {
   if (my === token) view.focus({ preventScroll: true });
 }
 
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => {
+  if (location.hash && !isRouteHash(location.hash) && (staticPostSlug || staticArchive || location.hash === '#view')) return;
+  render();
+});
 
 view.addEventListener('click', (e) => {
   const chip = e.target.closest('[data-filter]');
@@ -702,8 +834,8 @@ function refreshPaletteData() {
       title: p.title,
       meta: fmtDate(p.date),
       icon: 'text',
-      href: `#/post/${p.slug}`,
-      hay: [p.title, p.summary, ...(p.tags || [])].join(' '),
+      href: postHref(p.slug),
+      hay: [p.title, p.summary, ...(p.tags || []), p.searchText || ''].join(' '),
     })),
     ...TOOLS.map((t) => ({
       type: 'tool',
@@ -772,7 +904,7 @@ paletteInput.addEventListener('keydown', (e) => {
     const item = filtered[active];
     if (item) {
       closePalette();
-      location.hash = item.href;
+      location.assign(item.href.startsWith('#') ? rootHashUrl(item.href) : item.href);
     }
   } else if (e.key === 'Escape') {
     e.preventDefault();
@@ -795,7 +927,7 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'Escape' && !palette.hidden) {
     closePalette();
   } else if (e.key === 'Escape' && parseRoute().name !== 'home' && !e.target.closest('input,textarea,select')) {
-    location.hash = '#/';
+    location.assign(rootHashUrl('#/'));
   }
 });
 

@@ -206,4 +206,4 @@ const failed = Object.entries(results).filter(([, v]) => !v.ok);
 console.log(failed.length ? `FAILED ${failed.length}` : 'ALL PASS');
 await fetch(`http://127.0.0.1:${PORT}/json/close/${target.id}`);
 ws.close();
-process.exit(0);
+process.exit(failed.length ? 1 : 0);

@@ -3,11 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <!-- PAGE_META_START -->
   <title>wlixill · 调试笔记与本地工具</title>
   <meta name="description" content="wlixill 的个人站点：机器人感知与调试复盘笔记，外加一个装着 13 件本地工具的箱子。没有账号，没有上传。" />
+  <link rel="canonical" href="https://wlixill.github.io/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="wlixill · 笔记与工具" />
+  <meta property="og:title" content="wlixill · 调试笔记与本地工具" />
+  <meta property="og:description" content="wlixill 的个人站点：机器人感知与调试复盘笔记，外加一个装着 13 件本地工具的箱子。没有账号，没有上传。" />
+  <meta property="og:url" content="https://wlixill.github.io/" />
+  <meta property="og:image" content="https://wlixill.github.io/assets/bg/stormlight-fields-poster.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <!-- PAGE_META_END -->
   <meta name="theme-color" content="#08090c" />
   <link rel="icon" href="assets/img/favicon.png" type="image/png" />
   <link rel="stylesheet" href="assets/app.css" />
+  <link rel="stylesheet" href="assets/liquid-glass.css" />
 </head>
 <body>
   <div class="backdrop" id="backdrop" aria-hidden="true">
@@ -36,7 +47,7 @@
             <em>Notes &amp; Tools</em>
           </span>
         </a>
-        <button class="icon-btn rail-close" type="button" id="railClose" aria-label="关闭工具列表">
+        <button class="icon-btn rail-close" type="button" id="railClose" aria-label="关闭导航">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
       </div>
@@ -49,13 +60,13 @@
         </div>
       </div>
 
-      <button class="search-trigger" type="button" id="searchTrigger" aria-label="搜索工具">
+      <button class="search-trigger" type="button" id="searchTrigger" aria-label="搜索文章和工具">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" /></svg>
-        <span>搜索工具</span>
+        <span>搜索文章和工具</span>
         <kbd class="kbd">⌘K</kbd>
       </button>
 
-      <nav class="tool-nav" id="toolNav" aria-label="工具列表"></nav>
+      <nav class="tool-nav" id="toolNav" aria-label="站点导航"></nav>
 
       <div class="rail-foot">
         <div class="rail-note">
@@ -80,7 +91,7 @@
 
     <div class="main">
       <header class="topbar">
-        <button class="icon-btn" type="button" id="menuBtn" aria-label="打开工具列表" aria-expanded="false">
+        <button class="icon-btn" type="button" id="menuBtn" aria-label="打开导航" aria-controls="rail" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
         </button>
         <a class="topbar-brand" href="#/">
@@ -90,13 +101,23 @@
           wlixill
         </a>
         <div class="topbar-actions">
-          <button class="icon-btn" type="button" id="mobileSearch" aria-label="搜索工具">
+          <button class="icon-btn" type="button" id="mobileSearch" aria-label="搜索文章和工具">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" /></svg>
           </button>
         </div>
       </header>
 
-      <main id="view" class="view" tabindex="-1"></main>
+      <main id="view" class="view" tabindex="-1">
+        <!-- STATIC_VIEW_START -->
+        <noscript>
+          <header class="page-head">
+            <h1>wlixill · 调试笔记与本地工具</h1>
+            <p>文章无需 JavaScript 即可阅读；工具和站内搜索需要 JavaScript。</p>
+            <p><a class="section-link" href="posts/">浏览全部文章 →</a></p>
+          </header>
+        </noscript>
+        <!-- STATIC_VIEW_END -->
+      </main>
 
       <footer class="site-foot">
         <span>wlixill · 2026</span>
@@ -108,10 +129,10 @@
 
   <div class="palette" id="palette" hidden>
     <div class="palette-scrim" data-close></div>
-    <div class="palette-box" role="dialog" aria-modal="true" aria-label="搜索工具">
+    <div class="palette-box" role="dialog" aria-modal="true" aria-label="搜索文章和工具">
       <div class="palette-input">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" /></svg>
-        <input id="paletteInput" type="text" placeholder="搜索工具、标签或功能…" autocomplete="off" spellcheck="false" aria-label="搜索工具" />
+        <input id="paletteInput" type="text" placeholder="搜索文章、工具或正文…" autocomplete="off" spellcheck="false" aria-label="搜索文章和工具" />
         <kbd class="kbd">Esc</kbd>
       </div>
       <div class="palette-list" id="paletteList" role="listbox" aria-label="搜索结果"></div>
@@ -125,5 +146,6 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
   <script type="module" src="assets/app.js"></script>
+  <script type="module" src="assets/liquid-glass.js"></script>
 </body>
 </html>

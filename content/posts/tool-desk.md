@@ -3,7 +3,7 @@ title: 从一个丑首页，到能天天用的工具站
 date: 2026-11-10
 summary: 这个站点的由来：13 个本地小工具、一次彻底的视觉重做、一个把浏览器跑满的 ffmpeg，以及一个最终变成博客的首页。
 tags: [Web, 工具, 复盘]
-featured: true
+featured: false
 ---
 
 ## 起因：一个「能开」的首页

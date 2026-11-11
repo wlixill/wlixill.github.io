@@ -3,6 +3,7 @@ title: 给点云写了 CUDA，结果比 CPU 慢 16 倍
 date: 2026-10-10
 summary: 在 RTX 4060 上，体素降采样快了 8 倍，但加上统计离群点滤波之后，CUDA 版本慢了 16.8 倍。这不是 CUDA 的问题，是测量的方式的问题。
 tags: [CUDA, 点云, 性能]
+featured: true
 ---
 
 ## 一开始的假设

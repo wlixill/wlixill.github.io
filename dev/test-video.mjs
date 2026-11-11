@@ -52,6 +52,7 @@ console.log('start:', JSON.stringify(await evaluate(`(()=>{const b=document.quer
 
 const started = Date.now();
 let done = false;
+let succeeded = false;
 let lastState = '';
 while (Date.now() - started < 240000) {
   await sleep(3000);
@@ -69,7 +70,7 @@ while (Date.now() - started < 240000) {
     console.log(`t+${Math.round((Date.now() - started) / 1000)}s`, state);
     lastState = state;
   }
-  if (state.includes('"link":true')) { done = true; break; }
+  if (state.includes('"link":true')) { done = true; succeeded = true; break; }
   if (state.includes('失败')) { done = true; break; }
 }
 
@@ -77,4 +78,4 @@ console.log('done:', done);
 console.log('logs:\n' + logs.slice(-40).join('\n'));
 await fetch(`http://127.0.0.1:${PORT}/json/close/${target.id}`);
 ws.close();
-process.exit(0);
+process.exit(succeeded ? 0 : 1);

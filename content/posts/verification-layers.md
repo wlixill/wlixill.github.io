@@ -3,7 +3,7 @@ title: 验证要分层：从 git diff 到真机，中间隔着五道门
 date: 2026-10-12
 summary: 和 AI 结对写代码之后，最危险的词是「已完成」。我把一次改动的验证拆成六层，每层只证明它自己那一层。
 tags: [工程方法, AI 结对]
-featured: true
+featured: false
 ---
 
 ## 「已完成」是最危险的三个字

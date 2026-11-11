@@ -20,7 +20,7 @@
 
   --ink: #e9edf3;
   --ink-2: #9aa5b3;
-  --ink-3: #6a7686;
+  --ink-3: #8391a2;
 
   --accent: #5ce1c6;
   --accent-dim: #2f9c8a;
@@ -69,10 +69,10 @@
 
   --ink: #14171b;
   --ink-2: #55606f;
-  --ink-3: #8b95a2;
+  --ink-3: #5e6877;
 
-  --accent: #0f9d8a;
-  --accent-dim: #0b7a6b;
+  --accent: #087a6d;
+  --accent-dim: #075e54;
   --accent-ink: #ffffff;
   --accent-2: #5a6cf0;
   --danger: #d93a2f;
@@ -1447,6 +1447,10 @@ select.input {
 .btn-primary:hover {
   background: color-mix(in srgb, var(--accent) 88%, #fff);
   border-color: transparent;
+}
+
+[data-theme="light"] .btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 90%, #000);
 }
 
 .btn-ghost {
@@ -2928,7 +2932,8 @@ select.input {
   border-color: var(--line-2);
 }
 
-.filter-chip[aria-pressed="true"] {
+.filter-chip[aria-pressed="true"],
+.filter-chip[aria-current="page"] {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   color: color-mix(in srgb, var(--accent) 55%, var(--ink));
@@ -3052,7 +3057,7 @@ select.input {
 
 .nav-post-date {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 10.5px;
   color: var(--ink-3);
   letter-spacing: 0.02em;
 }
@@ -3134,6 +3139,68 @@ select.input {
   height: 12px;
 }
 
+/* Compact hand-picked reading path, separate from the chronological archive. */
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.featured-article {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  min-width: 0;
+  padding: 14px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--surface) 48%, transparent);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  transition: border-color 0.16s var(--ease), transform 0.16s var(--ease);
+}
+
+.featured-article:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
+}
+
+.featured-number {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.featured-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.featured-copy strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.5;
+}
+
+.featured-copy small {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.featured-article > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  color: var(--ink-3);
+}
+
 /* post cards */
 .post-grid {
   display: grid;
@@ -3167,7 +3234,7 @@ select.input {
   align-items: center;
   justify-content: space-between;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--ink-3);
   letter-spacing: 0.02em;
 }
@@ -3214,13 +3281,13 @@ select.input {
 .tag {
   display: inline-flex;
   align-items: center;
-  height: 21px;
-  padding: 0 8px;
+  min-height: 24px;
+  padding: 0 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface) 40%, transparent);
   color: var(--ink-3);
-  font-size: 10.5px;
+  font-size: 11.5px;
   white-space: nowrap;
   transition: color 0.14s var(--ease), border-color 0.14s var(--ease);
 }
@@ -3266,9 +3333,47 @@ select.input {
 
 .tag-filter {
   display: flex;
+  align-items: flex-start;
   gap: 6px;
   flex-wrap: wrap;
   margin: 4px 0 20px;
+}
+
+.tag-more {
+  flex: 0 0 auto;
+}
+
+.tag-more[open] {
+  flex-basis: 100%;
+}
+
+.tag-more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.tag-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tag-more > summary::after {
+  content: "+";
+  font-size: 15px;
+  line-height: 1;
+}
+
+.tag-more[open] > summary::after {
+  content: "−";
+}
+
+.tag-filter-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 /* post rows */
@@ -3688,6 +3793,7 @@ select.input {
 }
 
 @media (max-width: 860px) {
+  .featured-grid,
   .post-grid {
     grid-template-columns: 1fr;
   }
@@ -3724,7 +3830,7 @@ select.input {
   }
   .post-row-date {
     order: -1;
-    font-size: 10.5px;
+    font-size: 11.5px;
   }
   .post-row-arrow {
     display: none;
