@@ -48,7 +48,7 @@ node dev/build-posts.mjs
    - `posts/index.html` 和 `posts/<slug>/index.html`：静态归档和每篇文章的完整初始正文、独立标题、摘要、canonical、Open Graph/Twitter 信息。
    - `sitemap.xml` 和 `robots.txt`：供搜索引擎发现首页、归档和文章。
 
-构建直接复用浏览器的 Markdown 渲染器，结果不依赖构建时间。部署使用现成生成物，GitHub Pages 不会自动执行这个脚本；只提交 Markdown 不会更新线上文章页。`index.html` 中的 `PAGE_META` 和 `STATIC_VIEW` 注释是模板标记，请保留。生成文件请勿手改；重命名或删除文章后，脚本不会自动删除旧 slug 目录，请先确认内容归属再手动移除过期生成页。
+构建直接复用浏览器的 Markdown 渲染器，结果不依赖构建时间。部署使用现成生成物，GitHub Pages 不会自动执行这个脚本；只提交 Markdown 不会更新线上文章页。`index.html` 中的 `PAGE_META` 和 `STATIC_VIEW` 注释是模板标记，请保留。修改 `app.js` 或 `app.css` 后，也请更新 `index.html` 中对应资源的 `?v=` 版本并重新构建，避免浏览器混用旧缓存。生成文件请勿手改；重命名或删除文章后，脚本不会自动删除旧 slug 目录，请先确认内容归属再手动移除过期生成页。
 
 当前 canonical、分享图片和 sitemap 指向 `https://wlixill.github.io/`。如果域名或部署根路径改变，需同时更新 `dev/build-posts.mjs` 的 `siteUrl` 和首页 `index.html` 的元信息，再重新构建。
 
