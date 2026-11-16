@@ -168,6 +168,60 @@ async function toolCategoryState() {
   })()`);
 }
 
+// Compare actual browser screenshots over a stable striped fixture. The map
+// existing is not enough: the browser must really refract the backdrop, with
+// a neutral centre and no hard effect outside the lens.
+async function pointerRefractionPixels() {
+  try {
+    await evaluate(`(() => {
+      const fixture = document.createElement('div');
+      fixture.id = 'glass-refraction-test';
+      fixture.style.cssText = 'position:fixed;left:710px;top:370px;width:100px;height:100px;z-index:2147482000;pointer-events:none;background:repeating-linear-gradient(0deg,#111 0 3px,#eee 3px 6px)';
+      const style = document.createElement('style');
+      style.id = 'glass-refraction-test-style';
+      style.textContent = '.liquid-pointer__lens{background:transparent!important}.liquid-pointer__lens::before,.liquid-pointer__lens::after{display:none!important}';
+      document.body.append(fixture);
+      document.head.append(style);
+    })()`);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 760, y: 420 });
+    await pause(350);
+    const withFilter = await send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    await evaluate(`document.querySelector('.liquid-pointer__lens').style.setProperty('backdrop-filter','none','important')`);
+    const withoutFilter = await send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    return await evaluate(`new Promise((resolve) => {
+      const images = [new Image(), new Image()];
+      let loaded = 0;
+      images.forEach((image, index) => {
+        image.onerror = () => resolve(null);
+        image.onload = () => {
+          if (++loaded < 2) return;
+          const canvas = document.createElement('canvas');
+          canvas.width = 1440; canvas.height = 900;
+          const context = canvas.getContext('2d');
+          context.drawImage(images[0], 0, 0);
+          const first = context.getImageData(0, 0, 1440, 900).data;
+          context.clearRect(0, 0, 1440, 900);
+          context.drawImage(images[1], 0, 0);
+          const second = context.getImageData(0, 0, 1440, 900).data;
+          const sums = [0, 0, 0], counts = [0, 0, 0];
+          for (let y = -34; y <= 34; y++) for (let x = -34; x <= 34; x++) {
+            const radius = Math.hypot(x, y) / 32;
+            const region = radius < .4 ? 0 : radius > .55 && radius < .9 ? 1 : radius > 1 && radius < 1.05 ? 2 : -1;
+            if (region < 0) continue;
+            const offset = ((420 + y) * 1440 + 760 + x) * 4;
+            for (let channel = 0; channel < 3; channel++) sums[region] += Math.abs(first[offset + channel] - second[offset + channel]);
+            counts[region] += 3;
+          }
+          resolve({ center: sums[0] / counts[0], band: sums[1] / counts[1], outside: sums[2] / counts[2] });
+        };
+        image.src = 'data:image/png;base64,' + [${JSON.stringify(withFilter.data)}, ${JSON.stringify(withoutFilter.data)}][index];
+      });
+    })`);
+  } finally {
+    await evaluate(`document.querySelector('#glass-refraction-test')?.remove();document.querySelector('#glass-refraction-test-style')?.remove();document.querySelector('.liquid-pointer__lens')?.style.removeProperty('backdrop-filter')`);
+  }
+}
+
 // Keep the real repository request pending until a featured article has been
 // pressed, then release the response before mouseup. A late home insertion must
 // not move the link or steal the real click, on either desktop or mobile.
@@ -537,11 +591,33 @@ try {
     };
   })()`);
   check('glass.refraction-map', state.enabled && state.map.startsWith('data:image/png;base64,') && state.input === 'glass-field', JSON.stringify(state));
+  const field = await evaluate(`new Promise((resolve) => {
+    const image = new Image();
+    image.onerror = () => resolve(null);
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 128;
+      const context = canvas.getContext('2d');
+      context.drawImage(image, 0, 0);
+      const pixel = (x, y) => [...context.getImageData(x, y, 1, 1).data].slice(0, 2);
+      resolve({ center: pixel(64, 64), edge: pixel(127, 64), bevel: pixel(115, 64) });
+    };
+    image.src = document.querySelector('.liquid-pointer feImage').getAttribute('href');
+  })`);
+  const neutral = (pixel) => pixel?.every((value) => Math.abs(value - 128) <= 3);
+  check('glass.refraction-field-feathers', neutral(field?.center) && neutral(field?.edge) && Math.abs(field.bevel[0] - 128) > 30, JSON.stringify(field));
 
-  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1200, y: 520 });
-  await pause(60);
-  state = await evaluate(`(()=>{const r=document.querySelector('.liquid-pointer').getBoundingClientRect();return Math.hypot(r.left+r.width/2-1200,r.top+r.height/2-520)})()`);
-  check('glass.fast-pointer-stays-inside', state <= 12.1, `distance=${state.toFixed(2)}px`);
+  // Sample immediately after each trusted move; a delayed spring could satisfy
+  // a final-position test while still visibly trailing the native cursor.
+  const followDistances = [];
+  for (const [x, y] of [[1200, 520], [480, 160], [1040, 180], [1200, 520]]) {
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    const distance = await evaluate(`(()=>{const r=document.querySelector('.liquid-pointer').getBoundingClientRect();return Math.hypot(r.left+r.width/2-${x},r.top+r.height/2-${y})})()`);
+    followDistances.push(distance);
+  }
+  check('glass.pointer-follows-without-trailing', followDistances.every((distance) => distance <= 1), JSON.stringify(followDistances));
+  const pixelRefraction = await pointerRefractionPixels();
+  check('glass.refraction-real-pixels', pixelRefraction && pixelRefraction.center < 1 && pixelRefraction.band > 1 && pixelRefraction.outside < 1, JSON.stringify(pixelRefraction));
 
   await evaluate(`(()=>{const input=document.createElement('input');input.id='glass-test-input';input.style.cssText='position:fixed;left:720px;top:310px;width:80px;height:35px;z-index:2147482000';document.body.append(input)})()`);
   await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 760, y: 325 });

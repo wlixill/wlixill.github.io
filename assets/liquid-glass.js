@@ -1,24 +1,17 @@
-import './glass-controls.js?v=20261116-1';
+import './glass-controls.js?v=20261116-2';
 
 /* Decorative liquid-glass pointer. It never replaces the system cursor or receives clicks. */
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const forcedColors = matchMedia('(forced-colors: active)');
 
 let pointer = null;
-let frame = 0;
-let previousTime = 0;
 let hasPosition = false;
-let x = 0;
-let y = 0;
-let targetX = 0;
-let targetY = 0;
-let angle = 0;
 let selecting = false;
 let refractionMap;
 
-// Encode an independent, radial displacement field in R/G. The centre stays
-// neutral; only a narrow bevel bends the backdrop toward the lens centre.
-// This is progressive enhancement: CSS provides a regular blur if it fails.
+// Encode a radial displacement field in R/G. Both the centre and the outer
+// edge stay neutral, so the slight refraction feathers into the backdrop.
+// This is progressive enhancement: CSS provides a soft highlight if it fails.
 function makeRefractionMap() {
   if (refractionMap) return refractionMap;
   const size = 128;
@@ -32,8 +25,11 @@ function makeRefractionMap() {
       const nx = (px + 0.5 - size / 2) / (size / 2);
       const ny = (py + 0.5 - size / 2) / (size / 2);
       const radius = Math.hypot(nx, ny);
-      const t = Math.max(0, Math.min(1, (radius - 0.72) / 0.28));
-      const bevel = t * t * (3 - 2 * t);
+      const inner = Math.max(0, Math.min(1, (radius - 0.48) / 0.30));
+      const outer = Math.max(0, Math.min(1, (radius - 0.79) / 0.21));
+      const smoothInner = inner * inner * (3 - 2 * inner);
+      const smoothOuter = outer * outer * (3 - 2 * outer);
+      const bevel = smoothInner * (1 - smoothOuter);
       const direction = radius > 0 ? bevel / radius : 0;
       const offset = (py * size + px) * 4;
       image.data[offset] = Math.round(127.5 - 127.5 * nx * direction);
@@ -56,7 +52,7 @@ function makePointer() {
       <filter id="liquid-pointer-refraction" x="0" y="0" width="100%" height="100%"
         primitiveUnits="objectBoundingBox" color-interpolation-filters="sRGB">
         <feImage x="0" y="0" width="1" height="1" preserveAspectRatio="none" result="glass-field" />
-        <feDisplacementMap in="SourceGraphic" in2="glass-field" scale="0.22" xChannelSelector="R" yChannelSelector="G" />
+        <feDisplacementMap in="SourceGraphic" in2="glass-field" scale="0.10" xChannelSelector="R" yChannelSelector="G" />
       </filter>
     </svg>
     <span class="liquid-pointer__morph"><span class="liquid-pointer__lens"></span></span>`;
@@ -72,12 +68,9 @@ function makePointer() {
 }
 
 function hidePointer() {
-  if (frame) cancelAnimationFrame(frame);
-  frame = 0;
-  previousTime = 0;
   hasPosition = false;
   selecting = false;
-  pointer?.classList.remove('is-visible', 'is-pressed', 'is-interactive', 'is-editing', 'is-selecting');
+  pointer?.classList.remove('is-visible', 'is-pressed', 'is-editing', 'is-selecting');
 }
 
 function syncPreference() {
@@ -93,40 +86,6 @@ for (const preference of [reducedMotion, forcedColors]) {
   else preference.addListener(syncPreference);
 }
 
-function draw(time) {
-  if (!pointer || !hasPosition) {
-    frame = 0;
-    return;
-  }
-  const elapsed = previousTime ? Math.min(time - previousTime, 48) : 16;
-  previousTime = time;
-  const easing = 1 - Math.exp(-elapsed / 38);
-  const dx = targetX - x;
-  const dy = targetY - y;
-  x += dx * easing;
-  y += dy * easing;
-  let distance = Math.hypot(targetX - x, targetY - y);
-  // Keep the native cursor inside the lens even during fast movements.
-  if (distance > 12) {
-    x = targetX - (targetX - x) * 12 / distance;
-    y = targetY - (targetY - y) * 12 / distance;
-    distance = 12;
-  }
-  if (distance > 0.5) angle = Math.atan2(dy, dx) * 180 / Math.PI;
-  const stretch = 1 + Math.min(distance / 200, 0.06);
-  const squash = 1 / Math.sqrt(stretch);
-  pointer.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) translate(-50%, -50%)`;
-  pointer.style.setProperty('--lens-angle', `${angle.toFixed(1)}deg`);
-  pointer.style.setProperty('--lens-inverse-angle', `${(-angle).toFixed(1)}deg`);
-  pointer.style.setProperty('--lens-stretch', stretch.toFixed(3));
-  pointer.style.setProperty('--lens-squash', squash.toFixed(3));
-  if (distance > 0.25) frame = requestAnimationFrame(draw);
-  else {
-    frame = 0;
-    previousTime = 0;
-  }
-}
-
 function onMove(event) {
   // A real mouse event is a more reliable signal than media queries on hybrid devices.
   // Touch and stylus input never create the decorative element.
@@ -138,18 +97,14 @@ function onMove(event) {
   if (!pointer) pointer = makePointer();
   const element = event.target instanceof Element ? event.target : null;
   const editing = Boolean(element?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'));
-  const interactive = Boolean(element?.closest('a, button, summary, [role="button"], label'));
   pointer.classList.toggle('is-editing', editing);
-  pointer.classList.toggle('is-interactive', interactive);
-  targetX = event.clientX;
-  targetY = event.clientY;
+  // Position in the pointer event itself so the effect is centred under the
+  // native cursor on the next paint, with no artificial spring or trailing.
+  pointer.style.transform = `translate3d(${event.clientX}px, ${event.clientY}px, 0) translate(-50%, -50%)`;
   if (!hasPosition) {
-    x = targetX;
-    y = targetY;
     hasPosition = true;
     pointer.classList.add('is-visible');
   }
-  if (!frame) frame = requestAnimationFrame(draw);
 }
 
 document.addEventListener('pointermove', onMove, { passive: true });

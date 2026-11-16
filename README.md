@@ -142,7 +142,7 @@ node dev/fetch-github.mjs
 
 ## 液态玻璃交互
 
-参考 [Liquid Glass Design](https://liquidglassdesign.com/) 的画廊交互，以及 [Liquid Glass Studio](https://liquid-glass-studio.vercel.app/) 的清晰中心、边缘折射和方向性高光。卡片、导航、文章标签、工具筛选及分段选项使用玻璃材质；选中层会跟随实际选项移动，分类结果与数量同步更新。桌面鼠标另有轻微惯性的装饰镜片，不替换系统光标，也不拦截点击；触屏或手写笔不启用，输入和拖选文字时隐藏。减少动态效果时保留选中状态但关闭动效，强制颜色模式使用系统高亮。Chromium 已验证 SVG 背景边缘折射；Firefox 149 中保留透明高光与轻模糊，但 SVG 位移未生效。
+参考 [Liquid Glass Design](https://liquidglassdesign.com/) 的画廊交互，以及 [Liquid Glass Studio](https://liquid-glass-studio.vercel.app/) 的清晰中心和边缘折射。卡片、导航、文章标签、工具筛选及分段选项使用较通透的玻璃材质；选中层会跟随实际选项移动，分类结果与数量同步更新。桌面鼠标有直接对齐光标、边缘渐隐的轻微折射，不替换系统光标，也不拦截点击；背景有纹理或线条时更容易看见。触屏或手写笔不启用，输入和拖选文字时隐藏。减少动态效果时保留选中状态但关闭动效，强制颜色模式使用系统高亮。Chromium 已验证 SVG 背景折射；Firefox 149 中回退为轻微高光和模糊，SVG 位移未生效。
 
 ## 部署
 

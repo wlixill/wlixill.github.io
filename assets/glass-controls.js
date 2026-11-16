@@ -87,7 +87,7 @@ function makeFilter(indicator) {
   const displacement = document.createElementNS(ns, 'feDisplacementMap');
   displacement.setAttribute('in', 'SourceGraphic');
   displacement.setAttribute('in2', 'capsule-field');
-  displacement.setAttribute('scale', '0.32');
+  displacement.setAttribute('scale', '0.18');
   displacement.setAttribute('xChannelSelector', 'R');
   displacement.setAttribute('yChannelSelector', 'G');
   filter.append(image, displacement);
