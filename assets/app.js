@@ -400,7 +400,7 @@ function homeMarkup(projectPreview) {
       <img class="blog-avatar" src="${profile.avatar}" alt="${esc(profile.name)}" width="76" height="76" />
       <div class="blog-hero-copy">
         <span class="eyebrow"><span class="pulse"></span>${greeting()}，欢迎来坐坐</span>
-        <h1>我是 ${esc(profile.name)}，写点调试笔记，<br class="br" />也做一些顺手的工具。</h1>
+        <h1>让问题慢慢清晰，<br />让想法逐渐成形。</h1>
         <p>机器人感知方向的一线开发者。这里放那些「查了很久才想明白」的事：点云与配准、推理部署、工程习惯，以及一个装了 13 件小工具的箱子。</p>
         <div class="hero-links">
           <a class="btn btn-primary" href="#/posts">${icon('text')}读文章</a>
