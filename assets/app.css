@@ -2539,6 +2539,11 @@ select.input {
     padding: 0 16px;
   }
 
+  .topbar {
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
+
   .hero {
     padding: 24px 0 22px;
     gap: 16px;

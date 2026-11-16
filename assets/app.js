@@ -2,6 +2,7 @@ import { TOOLS, CATEGORIES, catOf, toolById } from './tools.js';
 import { icon } from './icons.js';
 import { $, $$, esc, greeting, relTime, toast } from './ui.js';
 import { parseFrontMatter, renderMarkdown, wireCodeCopy } from './markdown.js';
+import { mountProjects, projectTeasers } from './projects.js?v=20261116-1';
 
 // Resolve against the deployed asset directory, not the current article URL.
 const siteRoot = new URL('../', import.meta.url);
@@ -212,12 +213,20 @@ let reposCache = [];
 function loadRepos() {
   if (!reposPromise) {
     reposPromise = fetch(new URL('content/repos.json', siteRoot), { cache: 'no-cache' })
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((list) => {
+        if (!Array.isArray(list)) throw new Error('数据格式不正确');
         reposCache = list;
         return list;
       })
-      .catch(() => []);
+      .catch((err) => {
+        // Do not cache a transient failure as an empty, successful project list.
+        reposPromise = null;
+        throw new Error(`项目数据加载失败：${err?.message || '网络错误'}`);
+      });
   }
   return reposPromise;
 }
@@ -233,6 +242,7 @@ const nav = $('#toolNav');
 const MAIN_NAV = [
   { id: 'home', href: '#/', label: '首页', icon: 'house' },
   { id: 'posts', href: '#/posts', label: '文章', icon: 'text' },
+  { id: 'projects', href: '#/projects', label: '项目', icon: 'code' },
   { id: 'tools', href: '#/tools', label: '工具箱', icon: 'grid' },
   { id: 'about', href: '#/about', label: '关于', icon: 'user' },
 ];
@@ -378,10 +388,13 @@ function featuredArticle(post, index) {
   </a>`;
 }
 
-function homeMarkup() {
+function homeMarkup(projectPreview) {
   const latest = postsCache.slice(0, 4);
   const featured = postsCache.filter((post) => post.featured).slice(0, 3);
   const toolChips = TOOLS.slice(0, 6);
+  const projectArea = projectPreview.status === 'ready'
+    ? projectTeasers(projectPreview.repos)
+    : `<div class="section-head"><h2>项目</h2><a class="section-link" href="#/projects">${projectPreview.status === 'error' ? '重试' : '打开画廊'} ${icon('arrowRight')}</a></div><div class="empty-note">${projectPreview.status === 'error' ? '项目数据暂时无法加载。' : '打开项目画廊浏览全部仓库。'}</div>`;
   return `
     <section class="blog-hero">
       <img class="blog-avatar" src="${profile.avatar}" alt="${esc(profile.name)}" width="76" height="76" />
@@ -391,12 +404,15 @@ function homeMarkup() {
         <p>机器人感知方向的一线开发者。这里放那些「查了很久才想明白」的事：点云与配准、推理部署、工程习惯，以及一个装了 13 件小工具的箱子。</p>
         <div class="hero-links">
           <a class="btn btn-primary" href="#/posts">${icon('text')}读文章</a>
+          <a class="btn" href="#/projects">${icon('code')}看项目</a>
           <a class="btn" href="#/tools">${icon('grid')}逛工具箱</a>
           <a class="btn btn-ghost" href="${profile.html_url}" target="_blank" rel="noreferrer">${icon('github')}GitHub</a>
           <a class="btn btn-ghost" href="#/about">关于我${icon('arrowRight')}</a>
         </div>
       </div>
     </section>
+
+    <div id="homeProjectTeasers">${projectArea}</div>
 
     ${featured.length ? `<div class="section-head"><h2>精选文章</h2><span class="section-link">从这里开始</span></div>
     <div class="featured-grid">${featured.map(featuredArticle).join('')}</div>` : ''}
@@ -486,7 +502,8 @@ async function postMarkup(slug) {
 }
 
 async function aboutMarkup() {
-  await Promise.all([loadRepos(), profileReady]);
+  let reposUnavailable = false;
+  await Promise.all([loadRepos().catch(() => { reposUnavailable = true; }), profileReady]);
   return `
     <div class="post-wrap">
     <header class="page-head">
@@ -501,9 +518,10 @@ async function aboutMarkup() {
         <p>白天处理相机、点云、位姿和实时推理：让一条感知链路在真机上稳定跑起来，而不是只在 demo 里跑通。晚上会把当天卡住的地方写下来——写的过程中经常发现，真正的问题和一开始以为的不是同一个。</p>
 
         <h2>这个站点</h2>
-        <p>它有两部分：</p>
+        <p>它有三部分：</p>
         <ul>
           <li><strong>文章</strong>：调试复盘、工程方法，以及和 AI 结对写代码时踩过的坑。</li>
+          <li><strong>项目</strong>：从 GitHub 仓库整理的画廊，可以按语言浏览并切换项目详情。</li>
           <li><strong>工具箱</strong>：13 件日常会用到的本地工具，包括视频转码、JSON、时间戳、哈希、颜色、单位换算等。全部在浏览器里运行，不上传任何数据。</li>
         </ul>
 
@@ -526,6 +544,7 @@ async function aboutMarkup() {
             )
             .join('')}
         </ul>
+        ${reposUnavailable ? '<p>项目列表暂时无法加载，可以<a href="#/projects">前往项目页重试</a>。</p>' : ''}
         <p><a href="${profile.html_url}?tab=repositories" target="_blank" rel="noreferrer">在 GitHub 上看全部仓库 →</a></p>
 
         <h2>联系</h2>
@@ -565,8 +584,16 @@ function tileMarkup(tool, featured = false) {
   </a>`;
 }
 
+function filteredTools() {
+  return activeCat === 'all' ? TOOLS : TOOLS.filter((t) => t.cat === activeCat);
+}
+
+function gridCountText() {
+  return `${filteredTools().length} 件 / ${activeCat === 'all' ? CATEGORIES.length : 1} 类`;
+}
+
 function gridMarkup() {
-  const list = activeCat === 'all' ? TOOLS : TOOLS.filter((t) => t.cat === activeCat);
+  const list = filteredTools();
   const featured = activeCat === 'all' ? TOOLS.find((t) => t.featured) : null;
   const rest = featured ? list.filter((t) => !t.featured) : list;
   if (!list.length) return '<div class="empty-note">这个分类下还没有工具</div>';
@@ -600,7 +627,7 @@ function toolsMarkup() {
           (c) => `<button class="filter-chip" type="button" data-filter="${c.id}" aria-pressed="${activeCat === c.id}">${c.name}</button>`
         ).join('')}
       </div>
-      <span class="count" id="gridCount">${TOOLS.length} 件 / ${CATEGORIES.length} 类</span>
+      <span class="count" id="gridCount" aria-live="polite">${gridCountText()}</span>
     </div>
     <div class="tool-grid" id="toolGrid">${gridMarkup()}</div>`;
 }
@@ -639,12 +666,19 @@ function toolMarkup(tool) {
 const view = $('#view');
 wireCodeCopy(view);
 let cleanup = null;
+let projectController = null;
 let token = 0;
+
+function navigateProject(name) {
+  const hash = name ? `#/projects/${encodeURIComponent(name)}` : '#/projects';
+  if (location.hash !== hash) location.hash = hash;
+  else projectController?.sync(name || null);
+}
 
 function isRouteHash(hash) {
   if (!hash) return false;
   const fragment = hash.replace(/^#\/?/, '');
-  return hash.startsWith('#/') || /^(?:post|posts|tools)(?:\/|$)/.test(fragment) || fragment === 'about' || Boolean(toolById(fragment));
+  return hash.startsWith('#/') || /^(?:post|posts|projects|tools)(?:\/|$)/.test(fragment) || fragment === 'about' || Boolean(toolById(fragment));
 }
 
 function parseRoute() {
@@ -656,7 +690,9 @@ function parseRoute() {
   }
   if (!hash) return { name: 'home' };
   if (hash === 'posts') return { name: 'posts' };
+  if (hash === 'projects') return { name: 'projects', project: null };
   try {
+    if (hash.startsWith('projects/')) return { name: 'projects', project: decodeURIComponent(hash.slice(9)) || null };
     if (hash.startsWith('posts/')) return { name: 'posts', tag: decodeURIComponent(hash.slice(6)) };
     if (hash.startsWith('post/')) return { name: 'post', slug: decodeURIComponent(hash.slice(5)), legacyPost: true };
   } catch {
@@ -675,6 +711,7 @@ function setActiveNav(name, extra) {
     const on =
       (name === 'home' && id === 'home') ||
       ((name === 'posts' || name === 'post') && id === 'posts') ||
+      (name === 'projects' && id === 'projects') ||
       ((name === 'tools' || name === 'tool') && id === 'tools') ||
       (name === 'about' && id === 'about');
     if (on) a.setAttribute('aria-current', 'page');
@@ -721,6 +758,15 @@ async function render() {
     return;
   }
 
+  // Keep the gallery and its focus intact while opening, switching or closing
+  // a project. Only the dialog changes; hash history remains shareable.
+  if (route.name === 'projects' && projectController) {
+    setActiveNav(route.name, route);
+    projectController.sync(route.project);
+    document.title = route.project ? `${route.project} · 项目 · wlixill` : '项目 · wlixill';
+    return;
+  }
+
   if (cleanup) {
     try { cleanup(); } catch { /* noop */ }
     cleanup = null;
@@ -740,9 +786,16 @@ async function render() {
 
   try {
     if (route.name === 'home') {
-      await Promise.all([loadPosts(), profileReady]);
+      // Do not insert a large gallery above links after the user starts
+      // interacting. On slow networks keep the compact gallery entry for this
+      // render; the resolved cache is used next time the home page opens.
+      const preview = Promise.race([
+        loadRepos().then((repos) => ({ status: 'ready', repos })).catch(() => ({ status: 'error' })),
+        new Promise((resolve) => setTimeout(() => resolve({ status: 'deferred' }), 400)),
+      ]);
+      const [, , projectPreview] = await Promise.all([loadPosts(), profileReady, preview]);
       if (my !== token) return;
-      view.innerHTML = homeMarkup();
+      view.innerHTML = homeMarkup(projectPreview);
       document.title = 'wlixill · 笔记与工具';
     } else if (route.name === 'posts') {
       await loadPosts();
@@ -754,6 +807,17 @@ async function render() {
       if (my !== token) return;
       view.innerHTML = html;
       document.title = `${view.querySelector('.post-head h1')?.textContent || '文章'} · wlixill`;
+    } else if (route.name === 'projects') {
+      const projects = await loadRepos();
+      if (my !== token) return;
+      const controller = mountProjects(view, projects, navigateProject);
+      projectController = controller;
+      cleanup = () => {
+        controller.destroy();
+        if (projectController === controller) projectController = null;
+      };
+      document.title = route.project ? `${route.project} · 项目 · wlixill` : '项目 · wlixill';
+      controller.sync(route.project);
     } else if (route.name === 'tools') {
       view.innerHTML = toolsMarkup();
       document.title = '工具箱 · wlixill';
@@ -779,7 +843,9 @@ async function render() {
         mountEl.innerHTML = `<div class="panel"><div class="panel-body"><div class="alert">${icon('alert')}<span>这个工具没能加载：${esc(err?.message || err)}</span></div></div></div>`;
       }
     } else if (route.name === 'about') {
-      view.innerHTML = await aboutMarkup();
+      const html = await aboutMarkup();
+      if (my !== token) return;
+      view.innerHTML = html;
       document.title = '关于 · wlixill';
     } else {
       view.innerHTML = `<div class="empty-note" style="margin-top:60px">页面不存在。<a href="#/">回到首页</a></div>`;
@@ -787,10 +853,11 @@ async function render() {
     }
   } catch (err) {
     if (my !== token) return;
-    view.innerHTML = `<div class="panel" style="margin-top:40px"><div class="panel-body"><div class="alert">${icon('alert')}<span>加载失败：${esc(err?.message || err)}</span></div></div></div>`;
+    view.innerHTML = `<div class="panel" style="margin-top:40px"><div class="panel-body"><div class="alert" role="alert">${icon('alert')}<span>加载失败：${esc(err?.message || err)}</span></div><button class="btn" type="button" data-retry-route style="margin-top:12px">重试</button></div></div>`;
+    document.title = '加载失败 · wlixill';
   }
 
-  if (my === token) view.focus({ preventScroll: true });
+  if (my === token && !document.querySelector('.project-dialog[open]')) view.focus({ preventScroll: true });
 }
 
 window.addEventListener('hashchange', () => {
@@ -799,17 +866,24 @@ window.addEventListener('hashchange', () => {
 });
 
 view.addEventListener('click', (e) => {
+  if (e.target.closest('[data-retry-route]')) {
+    render();
+    return;
+  }
   const chip = e.target.closest('[data-filter]');
   if (chip && chip.tagName === 'BUTTON') {
     activeCat = chip.getAttribute('data-filter');
     $$('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b === chip)));
     const grid = $('#toolGrid');
-    if (grid) grid.innerHTML = gridMarkup();
-    const count = $('#gridCount');
-    if (count) {
-      const n = activeCat === 'all' ? TOOLS.length : TOOLS.filter((t) => t.cat === activeCat).length;
-      count.textContent = `${n} 件 / ${activeCat === 'all' ? CATEGORIES.length : 1} 类`;
+    if (grid) {
+      grid.classList.remove('is-switching');
+      grid.innerHTML = gridMarkup();
+      // Re-run the entrance when the same category is selected again.
+      void grid.offsetWidth;
+      grid.classList.add('is-switching');
     }
+    const count = $('#gridCount');
+    if (count) count.textContent = gridCountText();
     return;
   }
   if (e.target.closest('[data-search]')) openPalette();
@@ -920,6 +994,8 @@ palette.addEventListener('click', (e) => {
 [$('#searchTrigger'), $('#mobileSearch')].forEach((btn) => btn?.addEventListener('click', openPalette));
 
 document.addEventListener('keydown', (e) => {
+  // The modal owns Escape and focus until it closes.
+  if (document.querySelector('.project-dialog[open]')) return;
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key.toLowerCase() === 'k') {
     e.preventDefault();

@@ -1,3 +1,5 @@
+import './glass-controls.js?v=20261116-1';
+
 /* Decorative liquid-glass pointer. It never replaces the system cursor or receives clicks. */
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const forcedColors = matchMedia('(forced-colors: active)');

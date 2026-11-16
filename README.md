@@ -11,14 +11,15 @@
 
 | 路由 | 内容 |
 | --- | --- |
-| `/` 或 `/#/` | 博客首页：自我介绍、精选文章、最新 4 篇文章和工具箱入口 |
+| `/` 或 `/#/` | 博客首页：自我介绍、项目预览、精选文章、最新 4 篇文章和工具箱入口 |
 | `/posts/` 或 `/#/posts` | 全部文章；启用 JavaScript 后可按标签筛选（`/#/posts/调试`） |
 | `/posts/<slug>/` | 独立文章页面，含正文、上一篇 / 下一篇和分享元信息 |
+| `/#/projects`、`/#/projects/<仓库名>` | 根据真实仓库数据展示的项目画廊与可分享的详情弹层 |
 | `/#/tools` | 工具箱：13 件工具，按分类筛选 |
 | `/#/tools/<id>` | 单个工具（`json`、`video`、`timer` …） |
 | `/#/about` | 关于我 |
 
-旧的 `/#/post/<slug>` 会在启用 JavaScript 时跳转到对应的 `/posts/<slug>/`；旧的 `/#/json` 会跳到 `/#/tools/json`。文章正文与 `/posts/` 归档无需 JavaScript，工具、搜索和标签筛选需要 JavaScript。
+旧的 `/#/post/<slug>` 会在启用 JavaScript 时跳转到对应的 `/posts/<slug>/`；旧的 `/#/json` 会跳到 `/#/tools/json`。文章正文与 `/posts/` 归档无需 JavaScript，项目画廊、工具、搜索和标签筛选需要 JavaScript。
 
 ## 写一篇新文章
 
@@ -48,7 +49,7 @@ node dev/build-posts.mjs
    - `posts/index.html` 和 `posts/<slug>/index.html`：静态归档和每篇文章的完整初始正文、独立标题、摘要、canonical、Open Graph/Twitter 信息。
    - `sitemap.xml` 和 `robots.txt`：供搜索引擎发现首页、归档和文章。
 
-构建直接复用浏览器的 Markdown 渲染器，结果不依赖构建时间。部署使用现成生成物，GitHub Pages 不会自动执行这个脚本；只提交 Markdown 不会更新线上文章页。`index.html` 中的 `PAGE_META` 和 `STATIC_VIEW` 注释是模板标记，请保留。修改 `app.js`、`app.css` 或 `liquid-glass.css/js` 后，也请更新 `index.html` 中对应资源的 `?v=` 版本并重新构建，避免浏览器混用旧缓存。生成文件请勿手改；重命名或删除文章后，脚本不会自动删除旧 slug 目录，请先确认内容归属再手动移除过期生成页。
+构建直接复用浏览器的 Markdown 渲染器，结果不依赖构建时间。部署使用现成生成物，GitHub Pages 不会自动执行这个脚本；只提交 Markdown 不会更新线上文章页。`index.html` 中的 `PAGE_META` 和 `STATIC_VIEW` 注释是模板标记，请保留。修改 `app.js`、`app.css`、`projects.css` 或 `liquid-glass.css/js` 后，请更新 `index.html` 中对应资源的 `?v=` 版本并重新构建；修改 `projects.js` 或 `glass-controls.js` 时，也要更新导入它们的脚本中的版本号及入口脚本版本，避免浏览器混用旧缓存。生成文件请勿手改；重命名或删除文章后，脚本不会自动删除旧 slug 目录，请先确认内容归属再手动移除过期生成页。
 
 当前 canonical、分享图片和 sitemap 指向 `https://wlixill.github.io/`。如果域名或部署根路径改变，需同时更新 `dev/build-posts.mjs` 的 `siteUrl` 和首页 `index.html` 的元信息，再重新构建。
 
@@ -64,12 +65,14 @@ redesign/
 ├── content/
 │   ├── posts/*.md             # 文章源文件（Markdown + front matter）
 │   ├── posts.json             # 由 dev/build-posts.mjs 生成的索引
-│   ├── repos.json             # 关于页「开源」列表（可由 dev/fetch-github.mjs 更新）
+│   ├── repos.json             # 项目画廊与关于页仓库列表（可由 dev/fetch-github.mjs 更新）
 │   └── profile.json           # 昵称 / 头像 / GitHub 链接（同步脚本生成）
 ├── assets/
 │   ├── app.css                # 设计系统 + 博客 + 工具组件样式
 │   ├── app.js                 # 路由、主题、背景、导航、命令面板、各页面
-│   ├── liquid-glass.css/js    # 不拦截操作的液态玻璃鼠标跟随
+│   ├── liquid-glass.css/js    # 界面玻璃材质和不拦截操作的鼠标跟随
+│   ├── glass-controls.js      # 导航、筛选和分段选项的玻璃滑块
+│   ├── projects.css/js        # 项目画廊及可切换详情
 │   ├── markdown.js            # 极简 Markdown 渲染器 + 代码复制
 │   ├── tools.js               # 13 个工具的元数据与 12 个轻量工具实现
 │   ├── video.js               # 视频转码（ffmpeg.wasm 集成）
@@ -133,9 +136,13 @@ node dev/fetch-github.mjs
 - 尊重 `prefers-reduced-motion`（只显示海报帧），省流模式默认关闭，切后台自动暂停。
 - 换壁纸：替换 `assets/bg/` 下的 mp4 与 poster，改 `index.html` 里的 `data-src` / `poster`。
 
-## 液态玻璃鼠标
+## 项目画廊
 
-参考 [Liquid Glass Studio](https://liquid-glass-studio.vercel.app/) 的清晰中心、边缘折射和方向性高光，桌面鼠标移动时出现一枚带轻微惯性与点击形变的玻璃镜片。镜片不替换系统光标，也不会拦截点击；触屏或手写笔不启用，减少动态效果或强制颜色模式下自动关闭，输入和拖选文字时隐藏。支持 SVG 背景滤镜的浏览器使用径向位移场，其他浏览器回退到轻模糊。Chromium 已验证边缘折射；Firefox 149 中保持透明高光与轻模糊，但 SVG 位移未生效。
+画廊与首页项目预览读取 `content/repos.json`，可按实际仓库语言筛选；卡片中的玻璃图形是视觉示意，不是项目实拍。打开项目后可在详情层中切换上一项 / 下一项，地址可分享；Escape 关闭并返回画廊。仓库简介缺失时不会编造内容；数据请求失败时显示错误并可重试。网络较慢时首页先保留画廊入口，不在用户操作时插入预览导致版面跳动；之后回到首页会使用已加载的数据。
+
+## 液态玻璃交互
+
+参考 [Liquid Glass Design](https://liquidglassdesign.com/) 的画廊交互，以及 [Liquid Glass Studio](https://liquid-glass-studio.vercel.app/) 的清晰中心、边缘折射和方向性高光。卡片、导航、文章标签、工具筛选及分段选项使用玻璃材质；选中层会跟随实际选项移动，分类结果与数量同步更新。桌面鼠标另有轻微惯性的装饰镜片，不替换系统光标，也不拦截点击；触屏或手写笔不启用，输入和拖选文字时隐藏。减少动态效果时保留选中状态但关闭动效，强制颜色模式使用系统高亮。Chromium 已验证 SVG 背景边缘折射；Firefox 149 中保留透明高光与轻模糊，但 SVG 位移未生效。
 
 ## 部署
 
